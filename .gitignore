@@ -1,3 +1,7 @@
+insult-checkpoints/
+runs/
+discussions*/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
