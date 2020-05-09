@@ -6,6 +6,13 @@ import transformers
 import torch
 import gc
 import embedlib
+import classify
+import classify_sentiments
+import time
+import nltk
+import pymorphy2
+
+morph = pymorphy2.MorphAnalyzer()
 
 MAX_DIALOG_LEN = 10
 
@@ -51,18 +58,76 @@ def make_response(hist):
 def cohesion_metric(dialog):
     return 1.0
 
-def negation_metric(dialog):
+positiveness_detector = classify_sentiments.Bert4SentimentClassification.load_from('positiveness_detector')
+positiveness_detector.cpu()
+
+def positiveness_metric(dialog):
+    penalty = 0
+    total = 0
+    num = 0
+    print('positiveness')
+    for replic, actor in dialog:
+        if actor == 1:
+            num += 1
+            result = positiveness_detector([replic]).view(-1).item()
+            # neutral negative positive
+            if result[1] >= 0.5:
+                penalty += 0.1
+            elif result[2] >= 0.5:
+                penalty -= 1
+            print(replic, result)
+    print('penalty', penalty)
+    if num != 0:
+        return min(1.0, max(0.5 - penalty, 0))
+    else:
+        return 0
+
     return 1.0
 
+insult_detector = classify.Bert4Classification.load_from('insult_detector')
+insult_detector.cpu()
+
+obscenity_words = json.load(open('ru_obscenity_dataset/obscenity_words.json'))
+obscenity_words +=json.load(open('ru_obscenity_dataset/obscenity_words_extended.json'))
+polite_words = [morph.parse(word)[0].normal_form for word in json.load(open('polite_words.json'))]
+
 def politeness_metric(dialog):
-    return 1.0
+    penalty = 0
+    total = 0
+    num = 0
+    print('politeness')
+    for replic, actor in dialog:
+        if actor == 1:
+            num += 1
+            result = insult_detector([replic]).view(-1).item()
+            if result <= .1:
+                penalty += .1
+            words = nltk.word_tokenize(replic)
+            for word in words:
+                infinitive = morph.parse(word)[:3]
+                for el in infinitive:
+                    if el.normal_form in obscenity_words:
+                        penalty += .3
+                    elif el.normal_form in polite_words:
+                        penalty -= .05
+            print(replic, result)
+    print('penalty', penalty)
+    if num != 0:
+        return min(1.0, max(0.75 - penalty, 0))
+    else:
+        return 0
+
+def from_score_to_mark(score):
+    return score * 3 + 2
 
 def get_score(dialog):
     cohesion = cohesion_metric(dialog)
-    negation = negation_metric(dialog)
+    positiveness = positiveness_metric(dialog)
     politeness = politeness_metric(dialog)
-
-    return (cohesion + negation + politeness) / 3 * 5, [cohesion, negation, politeness]
+    marks = [from_score_to_mark(el) for el in [cohesion, positiveness, politeness]]
+    print('score', [cohesion, positiveness, politeness])
+    print('marks', marks)
+    return from_score_to_mark((cohesion + positiveness + politeness) / 3), marks
 
 def init_user(key):
     db.insert_one({'id': key, 'last': [], 'dialogs': [], 'state': UserState.main_menu})
@@ -82,9 +147,9 @@ def stop_command(key):
 
     user['last'] = []
     text = f"Вы прошли тест на {total:5.2f} баллов из 5.\n" \
-           f"Ваши баллы за связность: {metrics[0]*5:5.2f}\n" \
-           f"Ваши баллы за придерживание своего мнения: {metrics[1]*5:5.2f}\n" \
-           f"Ваши баллы за вежливость: {metrics[2]*5:5.2f}\n"
+           f"Ваши баллы за связность: {metrics[0]:5.2f}\n" \
+           f"Ваши баллы за позитивность: {metrics[1]:5.2f}\n" \
+           f"Ваши баллы за вежливость: {metrics[2]:5.2f}\n"
     user['last'].append((text, -1))
     user['dialogs'].append(user['last'])
     user['last'] = []
@@ -117,6 +182,8 @@ def reply_to(key):
     return replic
 
 def process_new_replic(key, replic):
+    if replic is None:
+        return
     replic = replic.strip()
     user = db.find_one({'id': key})
     if user is None:

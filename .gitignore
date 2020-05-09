@@ -1,6 +1,9 @@
-insult-checkpoints/
 runs/
 discussions*/
+insult*/
+rusentiment/
+sentiment*/
+positiveness*/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

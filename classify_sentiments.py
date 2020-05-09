@@ -3,6 +3,7 @@ import json
 import random
 import gc
 import tqdm
+import csv
 
 import transformers
 import torch
@@ -12,7 +13,7 @@ from tensorboardX import SummaryWriter
 import embedlib
 from embedlib.datasets import collate_wrapper
 
-class Bert4Classification(torch.nn.Module):
+class Bert4SentimentClassification(torch.nn.Module):
     def __init__(self, model=None, classifier=None):
         super().__init__()
         if model is None:
@@ -25,9 +26,8 @@ class Bert4Classification(torch.nn.Module):
         gc.collect()
 
         if classifier is None:
-            self.classifier = torch.nn.Sequential(torch.nn.Dropout(0.3),
-                                                    torch.nn.Linear(768, 1),
-                                                    torch.nn.Sigmoid())
+            self.classifier = torch.nn.Sequential(torch.nn.Dropout(0.3), torch.nn.Linear(768, 3),
+                                                    torch.nn.Softmax(dim=-1))
         else:
             self.classifier = classifier
 
@@ -57,32 +57,23 @@ class Bert4Classification(torch.nn.Module):
             self.model.eval()
             self.classifier.eval()
 
-class LiveJournalInsults(torch.utils.data.Dataset):
-    """http://tpc.at.ispras.ru/prakticheskoe-zadanie-2015/"""
-    path = 'discussions_tpc_2015'
-
-    def recursive_search(self, item):
-        is_insult = item.get('insult', False)
-        if is_insult:
-            self.insults.append(item['text'])
-        else:
-            self.normal.append(item['text'])
-
-        for child in item.get('children', []):
-            self.recursive_search(child)
+class RuSentimentDataset(torch.utils.data.Dataset):
+    """https://gitlab.com/kensand/rusentiment"""
+    path = 'rusentiment'
 
     def __init__(self, path=path):
-        self.insults = []
-        self.normal = []
-        for el in os.listdir(path):
-            for file in os.listdir(os.path.join(path, el)):
-                data = json.load(open(os.path.join(path, el, file)))
-                for entrie in data:
-                    self.recursive_search(entrie['root'])
-        mn = min(len(self.insults), len(self.normal))
-        insults = self.insults[:mn]
-        normal = self.normal[:mn]
-        self.data = [(txt, 0.0) for txt in insults] + [(txt, 1.0) for txt in normal]
+        self.data = []
+        class2id = {
+            'neutral': 0,
+            'negative': 1,
+            'positive': 2,
+        }
+        for file in os.listdir(path):
+            reader = csv.reader(open(os.path.join(path, file)))
+            for row in reader:
+                if row[0] not in class2id:
+                    continue
+                self.data.append((row[1], class2id[row[0]]))
 
     def __len__(self):
         return len(self.data)
@@ -92,10 +83,10 @@ class LiveJournalInsults(torch.utils.data.Dataset):
 
 if __name__ == '__main__':
     device = torch.device('cpu') if torch.cuda.device_count() == 0 else torch.device('cuda:0')
-    model = Bert4Classification()
+    model = Bert4SentimentClassification()
     model.to(device)
 
-    dataset = LiveJournalInsults()
+    dataset = RuSentimentDataset()
     print(f"Dataset size: {len(dataset)}")
     test_size = int(len(dataset) * 0.3)
     train_size = len(dataset) - test_size
@@ -107,8 +98,8 @@ if __name__ == '__main__':
                                         shuffle=True)
 
     optimizer = torch.optim.SGD(model.classifier.parameters(), lr=1e-4)
-    criterion = torch.nn.BCELoss()
-    checkpoint_dir = 'insult-checkpoints/'
+    criterion = torch.nn.CrossEntropyLoss()
+    checkpoint_dir = 'sentiment-checkpoints/'
     try:
         os.mkdir(checkpoint_dir)
     except:
@@ -121,9 +112,9 @@ if __name__ == '__main__':
         right = 0
         total = 0
         for texts, labels in tqdm.tqdm(iter(loader), desc=f"{dtype} epoch {epoch}"):
-            labels = labels.to(device, dtype=torch.float)
+            labels = labels.to(device)
             texts = list(texts)
-            predicted = model(texts).view(-1)
+            predicted = model(texts)
             loss = criterion(predicted, labels)
             if dtype == 'train':
                 optimizer.zero_grad()
@@ -133,10 +124,7 @@ if __name__ == '__main__':
             total += labels.shape[-1]
             curr_right = 0
             for i in range(labels.shape[-1]):
-                if labels[i] == 0 and predicted[i] < 0.5:
-                    curr_right += 1
-                elif labels[i] == 1 and predicted[i] >= 0.5:
-                    curr_right += 1
+                curr_right += (max(predicted[i][0], predicted[i][1], predicted[i][2]) == predicted[i][labels[i]]).item()
             right += curr_right
             writer.add_scalar(f"{dtype}/score", curr_right/labels.shape[-1], step_num)
             writer.add_scalar(f"{dtype}/loss", loss.item(), step_num)
@@ -145,16 +133,15 @@ if __name__ == '__main__':
         return total_loss/total, right/total
 
     writer = SummaryWriter()
-
     for epoch in range(25):
         model.train()
         train_mean_loss, train_acc = run(train_loader, dtype='train', epoch=epoch)
         print(f"train_mean_loss: {train_mean_loss:9.4f} train_acc: {train_acc:9.4f}")
 
-        model.eval()
         with torch.no_grad():
+            model.eval()
             test_mean_loss, test_acc = run(test_loader, dtype='test', epoch=epoch)
             print(f"test_mean_loss: {test_mean_loss:9.4f} test_acc: {test_acc:9.4f}")
         model_name = f"{test_acc:9.4f}|{test_mean_loss:9.4f}".replace(' ', '_')
         model.save_to(os.path.join(checkpoint_dir, model_name))
-    Bert4Classification.load_from(os.path.join(checkpoint_dir, model_name))
+    Bert4SentimentClassification.load_from(os.path.join(checkpoint_dir, model_name))
