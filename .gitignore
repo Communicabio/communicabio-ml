@@ -4,6 +4,14 @@ insult*/
 rusentiment/
 sentiment*/
 positiveness*/
+mongousers.txt
+gpt2_server/ru-*
+bert_server/rubert*
+gpt2_server/model/
+gpt2_server.zip
+rugpt2-half/
+rubert-base-uncased/
+ru-GPT2Like/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
