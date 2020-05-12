@@ -69,7 +69,7 @@ def positiveness_metric(dialog):
     for replic, actor in dialog:
         if actor == 1:
             num += 1
-            result = positiveness_detector([replic]).view(-1).item()
+            result = positiveness_detector([replic]).view(-1)
             # neutral negative positive
             if result[1] >= 0.5:
                 penalty += 0.1

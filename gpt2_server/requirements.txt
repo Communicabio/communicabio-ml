@@ -1,6 +1,5 @@
 Flask
-gunicorn
-transformers
 torch
+transformers
 six
 youtokentome

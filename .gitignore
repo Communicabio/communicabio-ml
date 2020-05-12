@@ -3,6 +3,8 @@ discussions*/
 insult*/
 rusentiment/
 sentiment*/
+gpt2_server/splitted
+gpt2_server/vocab.bpe
 positiveness*/
 mongousers.txt
 gpt2_server/ru-*
