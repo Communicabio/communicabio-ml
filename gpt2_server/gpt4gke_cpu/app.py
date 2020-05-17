@@ -6,25 +6,16 @@ from tokenizer import RubertaTokenizer
 import shutil
 from flask import request
 import torch
-import utils
 import shutil
 import logging
-import memhacks
 
 app = Flask(__name__)
 
 logging.info('Loading')
 tokenizer = RubertaTokenizer('vocab.bpe')
-model = memhacks.load_model('./ru-GPT2Like')
-# transformers.GPT2LMHeadModel.from_pretrained('./ru-GPT2Like') #utils.load_model(f'./ru-GPT2Like')
+model = transformers.GPT2LMHeadModel.from_pretrained('./ru-GPT2Like')
 logging.info('Model done')
 gc.collect()
-try:
-    shutil.rmtree('./ru-GPT2Like')
-    os.remove('vocab.bpe')
-except:
-    pass
-
 
 MAX_ADD_LENGTH = 70
 MAX_HIST_LENGTH = 500 - MAX_ADD_LENGTH
