@@ -1,5 +1,5 @@
 # metachallenge-chatbot
-My solution for metachallenge hackathon.
+For metachallenge hackathon.
 
 Mongo:
 
