@@ -2,4 +2,4 @@ pymongo
 tqdm
 transformers
 torch
-tensorboardX
+sacred
