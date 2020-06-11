@@ -1,11 +1,25 @@
-# metachallenge-chatbot
-For metachallenge hackathon.
 
-Mongo:
+# communicabio-ml
 
+Our solution for [Metachallenge hackathon](https://practicingfutures.org/meta).
 
-`sudo docker run --name my_mongodb -p 27017:27017 -d mongo`
+This repo contains:
 
+ - ``GPT-2`` deployment configs for ``Kubernetes`` (CPU + not working GPU) and ``Cloud Run``.
+ - ``GPT-2`` are available in Russian and English
+ - ``BERT`` for classification training scripts
+
+Check [communicabio-hints](https://github.com/Communicabio/communicabio-hints) for ``BERT`` deployment configs
+
+## Training
+
+We tried to create two models:
+1. For toxicity detection/measurement
+2. For positivity detection
+
+For deployment purposes we were unable to fine-tune ``BERT``*, thus, we added a small 1 linear layer network to ``BERT`` and trained it, instead of the whole model.
+
+*To minimize server cold start time we aimed to unify ``BERT`` servers. Due to 2``GB`` ``Cloud Run`` restrictions, it`s impossible to store different BERT models in one image.  
 
 ## Datasets
 
