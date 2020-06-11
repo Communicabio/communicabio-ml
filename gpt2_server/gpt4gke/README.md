@@ -1,10 +1,10 @@
 PROJECT_ID=stunning-hull-187717
 
-docker build . -t gcr.io/${PROJECT_ID}/gpt2_server:v11
+docker build . -t gcr.io/${PROJECT_ID}/gpt2_server
 
 docker login -u oauth2accesstoken -p "$(gcloud auth print-access-token)" https://gcr.io
 
-docker push gcr.io/${PROJECT_ID}/gpt2_server:v10
+docker push gcr.io/${PROJECT_ID}/gpt2_server
 
 gcloud container clusters create gpt2cluster \
   --accelerator=type=nvidia-tesla-k80 \

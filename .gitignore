@@ -14,6 +14,8 @@ gpt2_server.zip
 rugpt2-half/
 rubert-base-uncased/
 ru-GPT2Like/
+gpt2_server/*/gpt2
+datasets/jigsaw.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

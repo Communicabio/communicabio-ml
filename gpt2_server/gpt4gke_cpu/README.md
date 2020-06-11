@@ -1,14 +1,13 @@
 PROJECT_ID=stunning-hull-187717
-VERSION=3
 
-docker build . -t gcr.io/${PROJECT_ID}/gpt2_server_cpu:$VERSION
+docker build . -t gcr.io/${PROJECT_ID}/gpt2_server_cpu
 
 docker login -u oauth2accesstoken -p "$(gcloud auth print-access-token)" https://gcr.io
 
-docker push gcr.io/${PROJECT_ID}/gpt2_server_cpu:$VERSION
+docker push gcr.io/${PROJECT_ID}/gpt2_server_cpu
 
 gcloud container clusters create gpt2cluster-cpu \
-  --machine-type=custom-4-6144 \
+  --machine-type=custom-4-9216 \
   --disk-size=20Gb \
   --preemptible \
   --enable-autoscaling --max-nodes=3 --min-nodes=0 \
@@ -17,8 +16,8 @@ gcloud container clusters create gpt2cluster-cpu \
   --num-nodes=1 \
   --enable-cloud-monitoring
 
-
-kubectl create deployment gpt2-service-cpu --image=gcr.io/${PROJECT_ID}/gpt2_server_cpu:$VERSION
+PROJECT_ID=stunning-hull-187717
+kubectl create deployment gpt2-service-cpu --image=gcr.io/${PROJECT_ID}/gpt2_server_cpu
 kubectl expose deployment gpt2-service-cpu --type=LoadBalancer --port 80 --target-port 8080
 
 kubectl get events
